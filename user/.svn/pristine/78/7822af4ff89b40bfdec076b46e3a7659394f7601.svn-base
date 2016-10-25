@@ -1,0 +1,181 @@
+package com.lieying.user.controller;
+
+import java.util.Locale;
+import java.util.Map;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authc.AuthenticationException;
+import org.apache.shiro.authc.IncorrectCredentialsException;
+import org.apache.shiro.authc.LockedAccountException;
+import org.apache.shiro.authc.UnknownAccountException;
+import org.apache.shiro.authc.UsernamePasswordToken;
+import org.apache.shiro.authz.annotation.RequiresRoles;
+import org.apache.shiro.subject.Subject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.lieying.user.bean.UserBean;
+import com.lieying.user.entity.Response;
+import com.lieying.user.entity.SysUser;
+import com.lieying.user.service.UserService;
+
+@Controller
+public class HomeController {
+
+	private static final Logger log = LoggerFactory.getLogger(HomeController.class);
+
+	@Resource(name="userService")
+	private UserService userService;
+
+	@RequestMapping(value =  { "/", "/index" }, method = RequestMethod.GET)
+	public String home(Locale locale, Model model) {
+		String userName = (String)SecurityUtils.getSubject().getPrincipal();
+		model.addAttribute("loggedinUser", userName);
+		log.info("Welcome home {} ! The client locale is {}.",userName, locale);
+		return "login/index";
+	}
+
+	@RequestMapping("/hello1")
+	public String hello1() {
+		SecurityUtils.getSubject().checkRole("admin");
+		return "login/success";
+	}
+
+
+	@RequestMapping(value="/login", method = RequestMethod.POST)
+	public @ResponseBody Response<SysUser> login(@RequestParam() Map<String,Object> message) {
+		Response<SysUser> response = new Response<SysUser>();
+		SysUser user = null;
+		String username =(String)message.get("username");
+		String mail = (String)message.get("mail");
+		String telephone = (String)message.get("telephone");
+		String password = (String)message.get("password");
+		Subject subject = SecurityUtils.getSubject();
+		UsernamePasswordToken token = null;
+		try {
+			if(null != StringUtils.trimToNull(username)){
+				token = new UsernamePasswordToken(username, password);
+			}else if(null != StringUtils.trimToNull(mail)){
+				token = new UsernamePasswordToken(mail, password);
+			}else if(null != StringUtils.trimToNull(telephone)){
+				token = new UsernamePasswordToken(telephone, password);
+			}else{
+				throw new Exception("请输入账号/邮箱/手机号");
+			}
+			if("true".equals(message.get("rememberMe"))){
+				token.setRememberMe(true);
+			}
+			subject.login(token);
+		} catch (UnknownAccountException e) {
+			response.setSuccess(false);
+			response.setMsg("用户名/密码错误");
+			response.setCode("LY00001");
+		} catch (IncorrectCredentialsException e) {
+			response.setSuccess(false);
+			response.setMsg("用户名/密码错误");
+			response.setCode("LY00001");
+		} catch(LockedAccountException e){
+			response.setSuccess(false);
+			response.setMsg("该用户已被锁定");
+			response.setCode("LY00002");
+		}catch(AuthenticationException e){
+			e.printStackTrace();
+			response.setSuccess(false);
+			response.setMsg("其他错误：" + e.getMessage());
+			response.setCode("LY00003");
+			//其他错误，比如锁定，如果想单独处理请单独catch处理
+		}catch (Exception e) {
+			e.printStackTrace();
+			response.setSuccess(false);
+			response.setMsg("其他错误：" + e.getMessage());
+			response.setCode("LY00003");
+			//其他错误，比如锁定，如果想单独处理请单独catch处理
+		}
+		response.setCode("LY00000");
+		response.setMsg("用户登录成功");
+		response.setSuccess(true); 
+		if(null != StringUtils.trimToNull(username)){
+			user = userService.findByUsername(username);
+		}else if(null != StringUtils.trimToNull(mail)){
+			user = userService.findByMail(mail);
+		}else if(null != StringUtils.trimToNull(telephone)){
+			user = userService.findByTelephone(telephone);
+		}
+		response.setData(user);
+		log.info("------------------------"+response);
+		return response;
+	}
+
+	/**
+	 * user login
+	 * If user is already logged-in  redirect user to home page.
+	 */
+	//	@RequestMapping(value = "/login", method = RequestMethod.GET)
+	//	public String loginPageNew() {
+	//		return "login/login";
+	//	}
+
+	@RequiresRoles("admin")
+	@RequestMapping("/hello2")
+	public String hello2() {
+		return "login/success";
+	}
+
+	/**
+	 * user log out
+	 */
+	@RequestMapping(value="/logout", method = RequestMethod.GET)
+	public String logoutNew (HttpServletRequest request, HttpServletResponse response,Model model){
+		Subject subject = SecurityUtils.getSubject();
+		subject.logout();
+		model.addAttribute("logout", "success");
+		return "login/login";
+	}
+
+	/**
+	 *  Access-Denied redirect.
+	 */
+	@RequestMapping(value = "/accessDenied", method = RequestMethod.GET)
+	public String accessDeniedPage(ModelMap model) {
+		model.addAttribute("loggedinUser", (String)SecurityUtils.getSubject().getPrincipal());
+		return "accessDenied";
+	}
+
+
+	//@RequiresPermissions("user:changePassword")
+	@RequestMapping(value = "/toChangPasswordPage", method = RequestMethod.GET)
+	public String toChangPasswordPage(Model model,@RequestParam() Map<String,Object> message) {
+		//Subject subject = SecurityUtils.getSubject();
+		//String username = (String)subject.getPrincipal();
+		//SysUser user = userService.findByUsername(username);
+		UserBean userBean = new UserBean();
+		//userBean.setUser(user);
+		model.addAttribute("userBean", userBean);
+		return "login/userPasswordChange";
+	}
+
+	//@RequiresPermissions("user:changePassword")
+	@RequestMapping(value = "/userPasswordChange", method = RequestMethod.POST)
+	public String userPasswordChange(@ModelAttribute("userBean") UserBean userBean ,RedirectAttributes redirectAttr) throws Exception {
+		userService.updatePassword(userBean);
+		return "redirect:/login/index";
+	}
+
+
+
+
+}

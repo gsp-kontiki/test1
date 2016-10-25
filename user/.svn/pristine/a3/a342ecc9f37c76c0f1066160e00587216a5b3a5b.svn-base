@@ -1,0 +1,5 @@
+package com.lieying.user;
+@FunctionalInterface
+public interface TestInterface {
+	public boolean run(Long lon);
+}

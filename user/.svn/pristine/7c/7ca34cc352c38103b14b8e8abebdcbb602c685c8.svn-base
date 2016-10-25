@@ -1,0 +1,8 @@
+login_page_wrong_username_or_password=wrong user or password.
+login_page_login_out_success=You have been logged out successfully.
+login_page_ipput_user_name=Enter Username
+login_page_input_password=Enter Password
+login_page_qdbrowser_management_login=falcon browser management login
+login_page_remember-me=remember-me
+login_page_remember-password=remember-password
+login_page_login=Login
